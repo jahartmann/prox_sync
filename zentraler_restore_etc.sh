@@ -42,7 +42,7 @@ declare -A NODES=(
 )
 
 USER="root"
-REMOTE_DIR="/"  # Verzeichnis mit den Proxmox-Konfigurationen
+REMOTE_DIR="/etc/"  # Verzeichnis mit den Proxmox-Konfigurationen
 LOCAL_DIR="/backup/proxmox-configs-etc/"  # Lokales Backup-Verzeichnis auf CBS-Z
 
 # Datum für Backup-Ordner
