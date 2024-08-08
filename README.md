@@ -144,5 +144,4 @@ Wir hoffen, dass diese Skripte Ihre Backup- und Wiederherstellungsprozesse für 
 
 ---
 
-Ersetzen Sie die anonymisierten Informationen in den Skripten durch Ihre spezifischen Daten, um die Skripte an Ihre Umgebung anzupassen.
 
