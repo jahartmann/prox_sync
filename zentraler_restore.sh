@@ -39,116 +39,110 @@ echo_color "cyan" "
 
 echo_color "cyan" " Willkommen zum Prox_Sync Backup-Skript "
 
-# Liste der Proxmox-Nodes
+# Liste der Nodes (anonymisiert)
 declare -A NODES=(
-    ["Node1"]="IP-Adresse 1"
-    ["Node2"]="IP-Adresse 2"
-    ["Node3"]="IP-Adresse 3"
-    
-    
+    ["Node-01"]="192.168.0.1"
+    ["Node-02"]="192.168.0.2"
+    ["Node-03"]="192.168.0.3"
+    ["Node-04"]="192.168.0.4"
+    ["Node-05"]="192.168.0.5"
 )
 
-USER="root"
-REMOTE_DIR="/etc/pve/"  # Standardverzeichnis mit den Proxmox-Konfigurationen
-LOCAL_DIR="/backup/proxmox-configs/"  # Lokales Backup-Verzeichnis auf CBS-Z
+# Liste der Backup-Server (anonymisiert)
+declare -A BACKUP_SERVERS=(
+    ["Backup-01"]="192.168.0.101"
+    ["Backup-02"]="192.168.0.102"
+    ["Backup-03"]="192.168.0.103"
+    ["Backup-04"]="192.168.0.104"
+    ["Backup-05"]="192.168.0.105"
+)
 
-# Verfügbare Backup-Daten anzeigen
-echo_color "yellow" "Verfügbare Backup-Daten:"
-BACKUP_DATES=($(ls -d "${LOCAL_DIR}"*/ | xargs -n 1 basename))
+USER="Root"
+REMOTE_DIR="/etc/pve/"  # Standardverzeichnis mit den Konfigurationen
+NODE_LOCAL_DIR="/data/backup/nodes/"  # Lokales Backup-Verzeichnis für Nodes
+SERVER_LOCAL_DIR="/data/backup/backup-servers/"  # Lokales Backup-Verzeichnis für Backup-Server
+BACKUP_DIR="/etc/proxmox-backup/"  # Festes Verzeichnis für die Backup-Server
 
-# Überprüfen, ob Backups vorhanden sind
-if [ ${#BACKUP_DATES[@]} -eq 0 ]; then
-    echo_color "red" "Keine Backups gefunden."
-    exit 1
-fi
+# Auswahl: Node oder Backup-Server wiederherstellen
+echo_color "yellow" "Was möchten Sie wiederherstellen?"
+echo_color "green" "[1] Proxmox Node"
+echo_color "green" "[2] Backup-Server"
+read -p "Wählen Sie eine Option (1 oder 2): " RESTORE_OPTION
 
-# Backup-Daten mit Nummer anzeigen
-for i in "${!BACKUP_DATES[@]}"; do
-    echo_color "green" "[$i] ${BACKUP_DATES[$i]}"
-done
+# Verfügbare Nodes oder Backup-Server anzeigen und Auswahl treffen
+if [ "$RESTORE_OPTION" == "1" ]; then
+    # Proxmox Node wiederherstellen
+    echo_color "yellow" "Verfügbare Nodes:"
+    NODE_NAMES=("${!NODES[@]}")
+    for i in "${!NODE_NAMES[@]}"; do
+        echo_color "green" "[$i] ${NODE_NAMES[$i]} (${NODES[${NODE_NAMES[$i]}]})"
+    done
 
-# Benutzer zur Auswahl eines Backup-Datums auffordern
-read -p "Wählen Sie das Datum des Backups aus, das Sie wiederherstellen möchten (Nummer eingeben): " DATE_INDEX
+    # Benutzer zur Auswahl eines Nodes auffordern
+    read -p "Wählen Sie den Node aus, den Sie wiederherstellen möchten (Nummer eingeben): " NODE_INDEX
 
-# Prüfen, ob die Auswahl gültig ist
-if ! [[ "$DATE_INDEX" =~ ^[0-9]+$ ]] || [ "$DATE_INDEX" -ge "${#BACKUP_DATES[@]}" ]; then
+    # Prüfen, ob die Auswahl gültig ist
+    if ! [[ "$NODE_INDEX" =~ ^[0-9]+$ ]] || [ "$NODE_INDEX" -ge "${#NODE_NAMES[@]}" ]; then
+        echo_color "red" "Ungültige Auswahl."
+        exit 1
+    fi
+
+    SELECTED_NODE="${NODE_NAMES[$NODE_INDEX]}"
+    NODE_IP="${NODES[$SELECTED_NODE]}"
+    echo_color "blue" "Wiederherstellung der Konfiguration für $SELECTED_NODE ($NODE_IP)..."
+
+    # Ladeanimation
+    loading_animation
+
+    # Wiederherstellung mit rsync
+    rsync -avz --delete "${NODE_LOCAL_DIR}${SELECTED_DATE}/${SELECTED_NODE}/" "${USER}@${NODE_IP}:${REMOTE_DIR}"
+
+elif [ "$RESTORE_OPTION" == "2" ]; then
+    # Backup-Server wiederherstellen
+    echo_color "yellow" "Verfügbare Backup-Server:"
+    SERVER_NAMES=("${!BACKUP_SERVERS[@]}")
+    for i in "${!SERVER_NAMES[@]}"; do
+        echo_color "green" "[$i] ${SERVER_NAMES[$i]} (${BACKUP_SERVERS[${SERVER_NAMES[$i]}]})"
+    done
+
+    # Benutzer zur Auswahl eines Backup-Servers auffordern
+    read -p "Wählen Sie den Backup-Server aus, den Sie wiederherstellen möchten (Nummer eingeben): " SERVER_INDEX
+
+    # Prüfen, ob die Auswahl gültig ist
+    if ! [[ "$SERVER_INDEX" =~ ^[0-9]+$ ]] || [ "$SERVER_INDEX" -ge "${#SERVER_NAMES[@]}" ]; then
+        echo_color "red" "Ungültige Auswahl."
+        exit 1
+    fi
+
+    SELECTED_SERVER="${SERVER_NAMES[$SERVER_INDEX]}"
+    SERVER_IP="${BACKUP_SERVERS[$SELECTED_SERVER]}"
+    echo_color "blue" "Wiederherstellung der Konfiguration für $SELECTED_SERVER ($SERVER_IP)..."
+
+    # Ladeanimation
+    loading_animation
+
+    # Wiederherstellung mit rsync
+    rsync -avz --delete "${SERVER_LOCAL_DIR}${SELECTED_DATE}/${SELECTED_SERVER}/" "${USER}@${SERVER_IP}:${BACKUP_DIR}"
+
+else
     echo_color "red" "Ungültige Auswahl."
     exit 1
 fi
 
-SELECTED_DATE="${BACKUP_DATES[$DATE_INDEX]}"
-echo_color "blue" "Ausgewähltes Datum: $SELECTED_DATE"
-
-# Verfügbare Nodes anzeigen
-echo_color "yellow" "Verfügbare Nodes:"
-NODE_NAMES=("${!NODES[@]}")
-for i in "${!NODE_NAMES[@]}"; do
-    echo_color "green" "[$i] ${NODE_NAMES[$i]} (${NODES[${NODE_NAMES[$i]}]})"
-done
-
-# Benutzer zur Auswahl eines Nodes auffordern
-read -p "Wählen Sie den Node aus, den Sie wiederherstellen möchten (Nummer eingeben): " NODE_INDEX
-
-# Prüfen, ob die Auswahl gültig ist
-if ! [[ "$NODE_INDEX" =~ ^[0-9]+$ ]] || [ "$NODE_INDEX" -ge "${#NODE_NAMES[@]}" ]; then
-    echo_color "red" "Ungültige Auswahl."
-    exit 1
-fi
-
-SELECTED_NODE="${NODE_NAMES[$NODE_INDEX]}"
-NODE_IP="${NODES[$SELECTED_NODE]}"
-echo_color "blue" "Wiederherstellung der Konfiguration für $SELECTED_NODE ($NODE_IP)..."
-
-# Ladeanimation
-loading_animation
-
-# Optionen für rsync, um Berechtigungsprobleme zu vermeiden und fortzufahren
-RSYNC_OPTIONS=(
-    -avz
-    --ignore-errors
-    --no-times
-    --no-perms
-    --no-owner
-    --no-group
-    --copy-links
-    --exclude="pve/nodes/*/lrm_status"
-    --exclude="pve/.rrd"
-    --exclude="pve/.*"
-    --exclude="pve/nodes/.*"
-    --exclude=".rrd"
-    --exclude=".lrm_status"
-#    --rsync-path="sudo rsync"
-)
-
-# Wiederherstellung mit rsync, überspringt nicht übertragbare Dateien
-rsync "${RSYNC_OPTIONS[@]}" "${LOCAL_DIR}${SELECTED_DATE}/${SELECTED_NODE}/" "${USER}@${NODE_IP}:${REMOTE_DIR}"
-
+# Zertifikatsaktualisierung auf dem Ziel-System
 if [ $? -eq 0 ]; then
     echo_color "green" "Wiederherstellung abgeschlossen."
-    
+
     # Ladeanimation für die Zertifikataktualisierung
     loading_animation
 
-    # Aktualisierung der Zertifikate auf dem Ziel-Node
-    echo_color "yellow" "Aktualisierung der Zertifikate auf $SELECTED_NODE..."
-    ssh "${USER}@${NODE_IP}" "pvecm updatecerts --force"
+    echo_color "yellow" "Aktualisierung der Zertifikate auf $SELECTED_NODE oder $SELECTED_SERVER..."
+    ssh "${USER}@${NODE_IP:-$SERVER_IP}" "pvecm updatecerts --force"
     if [ $? -eq 0 ]; then
         echo_color "green" "Zertifikate erfolgreich aktualisiert."
     else
         echo_color "red" "Fehler bei der Aktualisierung der Zertifikate."
-    fi 
+    fi
 else
-    echo_color "red" "Wiederherstellung abgeschlossen."
-    
-    # Ladeanimation für die Zertifikataktualisierung
-    loading_animation
-
-    # Aktualisierung der Zertifikate auf dem Ziel-Node
-    echo_color "yellow" "Aktualisierung der Zertifikate auf $SELECTED_NODE..."
-    ssh "${USER}@${NODE_IP}" "pvecm updatecerts --force"
-    if [ $? -eq 0 ]; then
-        echo_color "green" "Zertifikate erfolgreich aktualisiert."
-    else
-        echo_color "red" "Fehler bei der Aktualisierung der Zertifikate."
-    fi 
+    echo_color "red" "Wiederherstellung fehlgeschlagen."
 fi
