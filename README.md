@@ -214,9 +214,7 @@ Dieses Skript synchronisiert die Proxmox-Konfigurationen aus dem Verzeichnis `/e
 
 - **Backup-Server und IP-Adressen definieren**:
   ```bash
-  declare
-
- -A BACKUP_SERVERS=(
+  declare -A BACKUP_SERVERS=(
       ["Backup-Server-1"]="IP-Adresse-1"
       ["Backup-Server-2"]="IP-Adresse-2"
       ...
